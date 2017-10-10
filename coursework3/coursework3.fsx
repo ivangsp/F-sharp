@@ -71,12 +71,14 @@ type Inproceeding = {
         }
 
 type Book = {
-     author:string list
+     author:string list option
+     editor:string option
      title:string
      publisher:string
      year:int
 
      volume:int         option
+     number:int         option
      series:string      option
      address:string     option 
      edition: string    option
@@ -165,14 +167,14 @@ let bibliographyData =
                 series=None;  year=2016; pages=Some(5,7); address=Some"Netherlands"; 
                 month=Some"December"; editor=None; organization=None});
     
-    Books({author=["M. Guadalupe Sánchez-Escribano"]; title="Engineering Computational Emotion"; 
+    Books({author=Some["M. Guadalupe Sánchez-Escribano"]; title="Engineering Computational Emotion"; 
             publisher="ISBN 978-3-319-59429-3"; year=2018; volume=None;series=None; address=None;
-            edition=None; month=None;note=None});
+            edition=None; month=None;note=None; number=None; editor=None});
 
-    Books({author=["Mark Hoogendoorn"; "Burkhardt Funk"]; 
+    Books({author=Some["Mark Hoogendoorn"; "Burkhardt Funk"]; 
             title="Machine Learning for the Quantified Self - On the Art of Learning from Sensory Data"; 
             publisher="ISBN 978-3-319-66307-4"; year=2017; volume=None;series=None; address=None;
-            edition=None; month=None;note=None});
+            edition=None; month=None;note=None;  number=None; editor=None});
 
     Mastersthesis({author=["Afu, Immaculate Ache"]; 
               title="Migration and brain drain effects in Cameroon. ";
@@ -245,7 +247,7 @@ let optionToTuple value =
     | None -> ""
 
 
-let formatInACMReferenceStyle  item:BibliographyItem = 
+let formatInACMReferenceStyle(item:BibliographyItem) = 
     match item with
     |Articles a           -> formatAuthor(a.author) + "." + a.year.ToString() + "." + " " + a.title + " "
                                     + a.journal + "," + " " + optionToInt(a.number).ToString()
@@ -253,10 +255,10 @@ let formatInACMReferenceStyle  item:BibliographyItem =
                                  + "),"+ optionToTuple(a.pages)
     |Inproceedings  i     -> formatAuthor(i.author) + "." + i.year.ToString() + "." + " " + i.title+". " + 
                               i.booktitle + "(" + optionToStr(i.series)+")" + "."
-    |Books b              -> formatAuthor(b.author) + "."+b.year.ToString()+"." + " "+ b.title+". "+
+    |Books b              -> formatAuthor(optionToList(b.author)) + "."+b.year.ToString()+"." + " "+ b.title+". "+
                              optionToStr(b.series) + "."
-    |Mastersthesis m      -> formatAuthor(m.author) + "."+m.year.ToString()+". "+m.title+", "+
-                             optionToStr(m.address) +"."
+    |Mastersthesis m      -> formatAuthor(m.author) + "." + m.year.ToString() + ". " + m.title + ", " + "." + 
+                             optionToStr(m.address) 
     |Misc m               -> formatAuthor(optionToList(m.author)) + "."+optionToInt(m.year).ToString()+". "+
                              "(" + monthToStr(optionToInt(m.month))+" "+ optionToInt(m.year).ToString() + ")."
 
@@ -270,7 +272,7 @@ let getAuthorAndYear (b_item1: BibliographyItem) =
     match b_item1 with
     |Articles a           ->(a.author, a.year)
     |Inproceedings  i     ->(i.author, i.year)
-    |Books b              ->(b.author, b.year)
+    |Books b              ->(optionList b.author, b.year)
     |Mastersthesis m      ->(m.author, m.year)
     |Misc m               ->(optionList m.author, optionIntValue m.year)
  
@@ -311,7 +313,7 @@ let getindex list ele =
 let getNumberedBibliography (item:BibliographyItem list) =
     item
     |> List.map(fun x ->"[" + (getindex item x).ToString() + "]" + formatInACMReferenceStyle(x))
-    |> List.fold(fun x s-> x +s + "\n")" "
+    |> List.fold(fun x s-> x + s + "\n")" "
 
 
 
@@ -322,7 +324,7 @@ let getNumberedBibliography (item:BibliographyItem list) =
 // format.
 (* 
 createArticle :
-  author:string ->
+  author:string list ->
     title:string ->
       journal:string ->
         year:int ->
@@ -331,7 +333,13 @@ createArticle :
               int * int option ->
                 month:int option ->
                   note:string option -> BibliographyItem
+
 *)
+let createArticle (author:string list) (title:string) (journal:string) (year:int)
+  (volume:int option) (number:int option) (page: (int * int) option) (month:int option) ( note:string option)=
+    Articles {author=author; title=title; journal=journal; year=year; volume=volume;number=number;
+              pages=page; month=month; note= note}
+
 (*
 createBook :
   author:string option ->
@@ -347,6 +355,8 @@ createBook :
                       month:int option ->
                         note:string option -> BibliographyItem
 *)
+
+let createBook(author:string option)
 (*
 createInProceedings :
   author:string ->
