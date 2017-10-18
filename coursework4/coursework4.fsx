@@ -53,21 +53,22 @@ type Permission = Read | Write | ReadWrite
 // (Permissions are initially assumed to be ReadWrite, check task 5)  
 // We assume that your file system is defined in a type called FileSystem.
 
-type FileSystem = Element list
+type FileSystem = (Permission*Element list)
 and  Element =
-    | File of FileInfo
+    | File of FileInfo //(name, Permission)
     | Dir of DirectoryInfo
-and FileInfo      = {name:string; permission:Permission}
-and DirectoryInfo = {name:string; permission:Permission; subdir:FileSystem}
+and FileInfo      = (string*Permission)
+and DirectoryInfo = (string*FileSystem)
 
-let optionSubDir value =
-    match value with 
-    | Some x -> x
-    | None      -> []
 
-let createEmptyFilesystem =  List.empty<FileSystem>
-    
-    
+let createEmptyFilesystem : FileSystem =(ReadWrite, [])
+    //let emptyElementList:Element=[]
+    //emptyElementList
+    //Element.empty
+
+//(ReadWrite, [File(name: "f1", permission: Read), Dir(name:"d2", (Write, []))])
+
+
 // 1. Define two functions 
 // createFile : string -> FileSystem -> FileSystem
 // that will create a file into the root directory of the 
@@ -76,20 +77,26 @@ let createEmptyFilesystem =  List.empty<FileSystem>
 // is the filesystem to create the file into. 
 // (Permissions are initially assumed to be ReadWrite, check task 5)  
 
-// let  createFile (filename:string) (dir:FileSystem) = 
-//     let file = File ({name=filename; permission=ReadWrite})
-//     dir @ [file] 
+let  createFile (filename:string) (fs:FileSystem) = 
+     let file = File (filename, ReadWrite)
+     match fs with
+     | (p,f) when p.Equals(ReadWrite) -> (p,[file]@f)
+     | _ -> failwith "permission denied"
+     
     
 
 // createDir : string -> FileSystem -> FileSystem
 // that will create a directory into the root directory of the current
 // file system.
-// The second argument is the name of the directory 
+// The first argument is the name of the directory 
 // (Permissions are initially assumed to be ReadWrite, check task 5)  
 
-let createDir (dirname:string) (file:FileSystem) = 
-   let dir = Dir({name = dirname; permission = ReadWrite; subdir = [] })
-   file @ [dir]
+let createDir (dirname:string) (fs:FileSystem) = 
+   let dir = Dir(dirname, fs)
+   match fs with
+   | (p, f)  when p.Equals(ReadWrite) || p.Equals(Write) -> (p, f@[dir])
+   | _       -> failwith "permission denied"
+  
 
 // 2. Define a function 
 // createSubDir : string -> FileSystem -> FileSystem -> FileSystem
@@ -97,30 +104,34 @@ let createDir (dirname:string) (file:FileSystem) =
 // contents given as the second argument into a file system given
 // as the third argument.
 
-let rec createSubDir (dirname:string)  (content:FileSystem) (fs:FileSystem) = 
-    let dir = Dir({name = dirname; permission = ReadWrite; subdir = content })
-    let rec loop (fs:FileSystem) = 
-         match fs with 
-         | (Dir d) ::_  when d.permission.Equals(ReadWrite) || d.permission.Equals(Write)  -> [Dir({name= d.name; permission= d.permission; subdir=[dir]})]
-         | (Dir d) ::_  when d.permission.Equals(Read) -> failwith "permision denied"
-         | _ :: tl     -> loop tl
-         | []          -> []
-    loop fs
-      
+let rec createSubDir (dirname:string)  (content:FileSystem) (filesys:FileSystem) = 
+    let dir = Dir(dirname, content)
+    let (p,fs) = filesys
+    let rec loopList fs =
+        match fs with
+        | Dir(name, (p1, fs1))::tl when p1.Equals(ReadWrite) || p1.Equals(Write) -> (p, [Dir(name, (p1, fs1@[dir]))]@tl )
+        | Dir(name, (p1, fs1))::tl when p.Equals(Read) ->failwith "permission denied, can only read"
+        | _::tl -> loopList tl 
+        | [] ->(p, fs@[dir])
+    loopList fs
+
+  
+     
 
 // 3. Define a function
 // count : FileSystem -> int
 // that will recursively count the number of files in the current filesystem.
 
-let  rec count (file:FileSystem) = 
-    match file with
-    | [] ->0
-    | h::tl -> (countFile h) + (count tl) 
-and countFile file = 
-    match file with 
-    | File h ->1
-    | Dir({name=n; subdir=dir; permission=p}) -> count(dir) 
-    | _ ->0
+let count (filesystem:FileSystem) = 
+    let rec loop filesys =
+        match filesys with
+        | (p, fs) -> matchList fs
+    and matchList fs =
+        match fs with 
+        | Dir (_, fs1)::tail ->  (loop fs1) + matchList tail
+        | File(_) :: tail       -> 1+ matchList tail
+        | [] ->0
+    loop filesystem
 
 
 // 4. Define a function
@@ -130,37 +141,45 @@ and countFile file =
 // represents a structure where "Dir1" is in the root directory, "Dir2" is
 // in "Dir1" and "File1" is in "Dir2".
 
-let rec changePermissions (permission: Permission) (lst:string list) (file:FileSystem) = 
-    match file with
-    | h:: tl -> nameElement (h, lst, permission):: changePermissions (permission) (lst) (tl)
-    | [] ->[]
-and nameElement (file, lst, permission) =
-    match file with 
-    | File f  when  checkName(f.name) (lst) -> File({permission=permission;name=f.name;}) 
-    | Dir d   when  checkName(d.name)(lst)  -> Dir({permission=permission; name= d.name; subdir=d.subdir})
-                                               //changePermissions(permission)(lst)(d.subdir)
-    | _ ->file     
-and checkName (name:string) (lst : string list) =
-    let rec loop lst =
-        match lst with 
-        | h:: tl  when name.Equals(h) -> true
-        | h:: tl  -> loop tl
-        | [] -> false
-    loop lst
-    
+let  changePermissions(permission:Permission) (path:string list) (filesystem:FileSystem)  = 
+    let (p, elementlist) = filesystem
+    let rec loop  (path:string list) (elementlist) :FileSystem=
+        match path  with
+        | h::t -> matchFs h t elementlist
+        | _  -> (p, elementlist)
+    and matchFs h t elementlist = 
+        match elementlist with
+        | Dir(name, (p1, fs))::tl when name.Equals(h) && List.isEmpty t-> 
+                (p, Dir(name, (permission, fs))::tl)
+
+        | Dir(name, (p1, fs))::tl when name.Equals(h) && not (List.isEmpty t)-> 
+                let fs1 = loop t fs 
+                (p, Dir(name, fs1)::tl)
+
+        | Dir(name, (p1, fs))::tl when not (name.Equals(h)) -> 
+                let (p,fs2) = loop (h::t) tl 
+                (p, Dir(name, (p1, fs))::fs2)
+  
+        | File(name, p1)::tl  when  name.Equals(h) ->
+                 (p, File(name, permission)::tl)
+
+        | File(name, p1)::tl  when not (name.Equals(h))->
+                let (p, fs2) =  loop (h::t) tl 
+                (p, File(name, p1)::fs2)
+
+        | _ -> (p, elementlist)
+
+    loop path elementlist
+
+
+
 
 // 5. Modify the implementations of createFile and createDir to honor the
 // permissions of the current file system level, i.e. if the permission 
 // of the current directory is not Write or ReadWrite, the function should fail
 // with an exception and an appropriate message (that you should formulate yourself).
-// Hint: use the built-in failwith function.
-
-let createFile (filename:string) (fs:FileSystem) = 
-     let file = File ({name=filename; permission=ReadWrite})
-     match fs with
-     | (Dir d)::_  when d.permission.Equals(ReadWrite) || d.permission.Equals(Write ) -> [file] @ fs 
-     | (Dir d)::_  when d.permission.Equals(Read) -> failwith "Invalid permission"
-     | _       ->
+// Hint: use the built-in failwith function.    
+     
 
 // 6. Implement the function
 // locate : string -> FileSystem -> string list list
@@ -170,7 +189,28 @@ let createFile (filename:string) (fs:FileSystem) =
 // structure.
 // Note that the locate should honor the permissions, i.e. the files from
 // directories without a read permission should not be returned.
+let rec locate (name:string) (filesys: FileSystem) =
+    let (p,elementlist) = filesys
+    let rec loop elementlist (path:string list) (result)= 
 
+        match elementlist with
+        | File(n, p1)::tl ->
+            if  p1.Equals(Write)  && name.Equals(n) || p1.Equals(ReadWrite) && name.Equals(n) then
+                (path@[n]) :: loop tl (path) result
+            else
+                loop tl (path) result
+
+        | Dir(n, (p1, elmlist))::tl ->
+            if p1.Equals(Write) && name.Equals(n)  || p1.Equals(ReadWrite) && name.Equals(n) then
+                (path@[n])::loop elmlist (path@[n]) (result) @ loop tl (path) (result)
+
+            elif p1.Equals(Write) && not (name.Equals(n)) || p1.Equals(ReadWrite) && not (name.Equals(n)) then
+                 loop elmlist (path@[n]) (result) @ loop tl (path) (result)
+            else
+                loop tl path result
+        | [] -> result
+
+    loop elementlist [] []
 
 // 7. Implement the function
 // delete : string list -> FileSystem -> FileSystem
@@ -179,6 +219,67 @@ let createFile (filename:string) (fs:FileSystem) =
 // not containing the file or directory represented by the first argument.
 // If the file or directory does not have a write permission, the deletion should not
 // be performed and the original file system should be returned.
+
+let delete  (path: string list) (filesystem: FileSystem) = 
+    let (p, fs)  = filesystem 
+    let rec loop path fs =
+        match path with
+        | h::t -> matchElmentList h t fs
+        | _    -> (p, fs)
+    
+    and matchElmentList h t fs =
+        match fs with 
+        | File(n, p1)::tl  when not (p1.Equals(Read)) && n.Equals(h) -> (p, tl)
+
+        | File(n, p1) as f::tl  when  not (n.Equals(h)) ->
+            let (p2,fs) = loop (h::t) tl
+            (p, f::fs)
+        
+        | Dir(n, (p1, fs)):: tl when not (p1.Equals(Read)) && n.Equals(h) -> 
+            if List.isEmpty t then
+                 (p, tl)
+            else
+                let (p3,fs1) = loop t tl
+                (p, (Dir(n, (p1,fs))::fs1))
+           
+        | Dir(n, (p1, fs)) as f1:: tl when  not (n.Equals(h)) ->
+            let (p2, f) = loop (h::t) tl
+            (p, f1::f)
+
+        | _ ->  (p, fs) 
+    
+    loop path fs
+
+// let delete  (path: string list) (filesystem: FileSystem) = 
+//     let (p, fs)  = filesystem 
+//     let rec loop path fs =
+//         match path with
+//         | [h] -> 
+//             match fs with 
+//             | File(n, p1)::tl  when not (p1.Equals(Read)) && n.Equals(h) ->
+//                 (p, tl)
+//             | Dir(n, (p1, fs)):: tl when not (p1.Equals(Read)) && n.Equals(h) ->
+//                 (p, tl)
+//             | _ -> failwith "permission denied"
+
+//         | h::t ->
+//             match fs with 
+//             | Dir(n, (p1, fs')):: tl when not (p1.Equals(Read)) && n.Equals(h) ->
+//                 let fs1 = loop t fs' 
+//                 (p, (Dir(n, fs1))::tl)
+
+//             | File(n, p1) as f :: tl->
+//                 let (p2, fs2) = loop (h::t) tl
+//                 (p, f::fs2) 
+
+//             | Dir(n, (p1, fs')) as f:: tl ->
+//                 let (p2, fs2) = loop (h::t) tl
+//                 (p,  f::fs2 )
+//             | _ -> failwith " invalid"
+//         | [] ->(p, []) 
+//     loop path fs
+                   
+
  
 // Bonus (1p):
 // 8. Implement the function:
