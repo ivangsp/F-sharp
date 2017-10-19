@@ -171,9 +171,6 @@ let  changePermissions(permission:Permission) (path:string list) (filesystem:Fil
 
     loop path elementlist
 
-
-
-
 // 5. Modify the implementations of createFile and createDir to honor the
 // permissions of the current file system level, i.e. if the permission 
 // of the current directory is not Write or ReadWrite, the function should fail
@@ -235,14 +232,14 @@ let delete  (path: string list) (filesystem: FileSystem) =
             let (p2,fs) = loop (h::t) tl
             (p, f::fs)
         
-        | Dir(n, (p1, fs)):: tl when not (p1.Equals(Read)) && n.Equals(h) -> 
-            if List.isEmpty t then
+        | Dir(n, (p1, fs)):: tl when not (p1.Equals(Read)) && n.Equals(h) &&  List.isEmpty t -> 
                  (p, tl)
-            else
-                let (p3,fs1) = loop t tl
-                (p, (Dir(n, (p1,fs))::fs1))
+
+        | Dir(n, (p1, fs))::tl  when not (p1.Equals(Read)) && n.Equals(h) && not (List.isEmpty t) -> 
+                let fs1 = loop t fs 
+                (p, Dir(n, fs1)::tl)
            
-        | Dir(n, (p1, fs)) as f1:: tl when  not (n.Equals(h)) ->
+        | Dir(n, _) as f1:: tl when  not (n.Equals(h)) ->
             let (p2, f) = loop (h::t) tl
             (p, f1::f)
 
