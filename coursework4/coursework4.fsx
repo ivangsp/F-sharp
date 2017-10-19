@@ -143,33 +143,34 @@ let count (filesystem:FileSystem) =
 
 let  changePermissions(permission:Permission) (path:string list) (filesystem:FileSystem)  = 
     let (p, elementlist) = filesystem
-    let rec loop  (path:string list) (elementlist) :FileSystem=
+    let rec loop  (path:string list) (elementlist) =
         match path  with
         | h::t -> matchFs h t elementlist
-        | _  -> (p, elementlist)
+        | _  ->  elementlist
     and matchFs h t elementlist = 
         match elementlist with
-        | Dir(name, (p1, fs))::tl when name.Equals(h) && List.isEmpty t-> 
-                (p, Dir(name, (permission, fs))::tl)
+        | Dir(name, (_, fs))::tl when name.Equals(h) && List.isEmpty t-> 
+                Dir(name, (permission, fs))::tl
 
         | Dir(name, (p1, fs))::tl when name.Equals(h) && not (List.isEmpty t)-> 
                 let fs1 = loop t fs 
-                (p, Dir(name, fs1)::tl)
+                Dir(name, (p1, fs1))::tl
 
         | Dir(name, (p1, fs))::tl when not (name.Equals(h)) -> 
-                let (p,fs2) = loop (h::t) tl 
-                (p, Dir(name, (p1, fs))::fs2)
+                let  fs2 = loop (h::t) tl 
+                Dir(name, (p1, fs))::fs2
   
-        | File(name, p1)::tl  when  name.Equals(h) ->
-                 (p, File(name, permission)::tl)
+        | File(name, _)::tl  when  name.Equals(h) ->
+                 File(name, permission)::tl
 
         | File(name, p1)::tl  when not (name.Equals(h))->
-                let (p, fs2) =  loop (h::t) tl 
-                (p, File(name, p1)::fs2)
+                let  fs2 =  loop (h::t) tl 
+                File(name, p1)::fs2
 
-        | _ -> (p, elementlist)
+        | _ -> failwith "Invalid path"
+    let result = loop path elementlist
+    (p, result)
 
-    loop path elementlist
 
 // 5. Modify the implementations of createFile and createDir to honor the
 // permissions of the current file system level, i.e. if the permission 
@@ -187,7 +188,7 @@ let  changePermissions(permission:Permission) (path:string list) (filesystem:Fil
 // Note that the locate should honor the permissions, i.e. the files from
 // directories without a read permission should not be returned.
 let rec locate (name:string) (filesys: FileSystem) =
-    let (p,elementlist) = filesys
+    let (_, elementlist) = filesys
     let rec loop elementlist (path:string list) (result)= 
 
         match elementlist with
@@ -217,65 +218,38 @@ let rec locate (name:string) (filesys: FileSystem) =
 // If the file or directory does not have a write permission, the deletion should not
 // be performed and the original file system should be returned.
 
-let delete  (path: string list) (filesystem: FileSystem) = 
-    let (p, fs)  = filesystem 
-    let rec loop path fs =
+let delete  (path: string list) (filesystem: FileSystem) =
+    let rec loop path filesystem =
         match path with
-        | h::t -> matchElmentList h t fs
-        | _    -> (p, fs)
+        | h::t -> matchElmentList h t filesystem
+        | _    -> filesystem
     
     and matchElmentList h t fs =
         match fs with 
-        | File(n, p1)::tl  when not (p1.Equals(Read)) && n.Equals(h) -> (p, tl)
+        | File(n, p1)::tl  when not (p1.Equals(Read)) && n.Equals(h) -> tl
 
-        | File(n, p1) as f::tl  when  not (n.Equals(h)) ->
-            let (p2,fs) = loop (h::t) tl
-            (p, f::fs)
+        | File(n, _) as f::tl  when  not (n.Equals(h)) ->
+            let fs = loop (h::t) tl
+            f::fs
         
-        | Dir(n, (p1, fs)):: tl when not (p1.Equals(Read)) && n.Equals(h) &&  List.isEmpty t -> 
-                 (p, tl)
+        | Dir(n, (p1, _)):: tl when not (p1.Equals(Read)) && n.Equals(h) &&  List.isEmpty t -> tl
 
         | Dir(n, (p1, fs))::tl  when not (p1.Equals(Read)) && n.Equals(h) && not (List.isEmpty t) -> 
                 let fs1 = loop t fs 
-                (p, Dir(n, fs1)::tl)
+                Dir(n, (p1, fs1))::tl
            
         | Dir(n, _) as f1:: tl when  not (n.Equals(h)) ->
-            let (p2, f) = loop (h::t) tl
-            (p, f1::f)
+            let f = loop (h::t) tl
+            f1::f
 
-        | _ ->  (p, fs) 
-    
-    loop path fs
+        | _ -> failwith " Invalid path" 
+        
+    let (p, fs)  = filesystem 
+    let result = loop path fs
+    (p, result)
 
-// let delete  (path: string list) (filesystem: FileSystem) = 
-//     let (p, fs)  = filesystem 
-//     let rec loop path fs =
-//         match path with
-//         | [h] -> 
-//             match fs with 
-//             | File(n, p1)::tl  when not (p1.Equals(Read)) && n.Equals(h) ->
-//                 (p, tl)
-//             | Dir(n, (p1, fs)):: tl when not (p1.Equals(Read)) && n.Equals(h) ->
-//                 (p, tl)
-//             | _ -> failwith "permission denied"
+ 
 
-//         | h::t ->
-//             match fs with 
-//             | Dir(n, (p1, fs')):: tl when not (p1.Equals(Read)) && n.Equals(h) ->
-//                 let fs1 = loop t fs' 
-//                 (p, (Dir(n, fs1))::tl)
-
-//             | File(n, p1) as f :: tl->
-//                 let (p2, fs2) = loop (h::t) tl
-//                 (p, f::fs2) 
-
-//             | Dir(n, (p1, fs')) as f:: tl ->
-//                 let (p2, fs2) = loop (h::t) tl
-//                 (p,  f::fs2 )
-//             | _ -> failwith " invalid"
-//         | [] ->(p, []) 
-//     loop path fs
-                   
 
  
 // Bonus (1p):
@@ -286,3 +260,46 @@ let delete  (path: string list) (filesystem: FileSystem) =
 // In case the item to be deleted is a directory, it needs to honor permissions
 // and recursively only delete files with write permissions from directories with 
 // write permissions. Subdirectories which will become empty need to be deleted as well. 
+
+let recursiveDelete (path: string list) (filesystem: FileSystem) = 
+    let rec loop path fs =
+        match path with
+        | h::t -> matchElmentList h t fs
+        | _    -> fs
+    
+    and matchElmentList h t fs =
+        match fs with 
+        | File(n, p1)::tl  when not (p1.Equals(Read)) && n.Equals(h) -> tl
+
+        | File(n, _) as f::tl  when  not (n.Equals(h)) ->
+            let fs = loop (h::t) tl
+            f::fs
+        
+        | Dir(n, (p1, fs)):: tl when not (p1.Equals(Read)) && n.Equals(h) &&  List.isEmpty t -> 
+            let result = deleteContent fs
+            Dir(n, (p1, result))::tl
+
+        | Dir(n, (p1, fs))::tl  when not (p1.Equals(Read)) && n.Equals(h) && not (List.isEmpty t) -> 
+                let fs1 = loop t fs 
+                Dir(n, (p1, fs1))::tl
+           
+        | Dir(n, _) as f1:: tl when  not (n.Equals(h)) ->
+            let  f = loop (h::t) tl
+            f1::f
+
+        | _ ->  fs 
+    and deleteContent fs =
+        match fs with
+        | File(_, p2)::tl  when not (p2.Equals(Read)) ->  [] @ deleteContent tl
+
+        | Dir(n, (p2, fs1))::tl  when not (p2.Equals(Read)) ->   
+            let r1 = deleteContent fs1
+            if List.isEmpty r1 then
+                []
+            else
+                Dir(n, (p2, r1)) ::deleteContent tl
+        | _ -> fs
+    let (p, fs)  = filesystem 
+    let result = loop path fs
+    (p, result)
+
