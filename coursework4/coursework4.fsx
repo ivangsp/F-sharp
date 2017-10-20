@@ -61,10 +61,9 @@ and FileInfo      = (string*Permission)
 and DirectoryInfo = (string*FileSystem)
 
 
-let createEmptyFilesystem : FileSystem =(ReadWrite, [])
-    //let emptyElementList:Element=[]
-    //emptyElementList
-    //Element.empty
+let createEmptyFilesystem() =
+    (ReadWrite, List.empty<Element>)
+
 
 //(ReadWrite, [File(name: "f1", permission: Read), Dir(name:"d2", (Write, []))])
 
@@ -107,13 +106,11 @@ let createDir (dirname:string) (fs:FileSystem) =
 let rec createSubDir (dirname:string)  (content:FileSystem) (filesys:FileSystem) = 
     let dir = Dir(dirname, content)
     let (p,fs) = filesys
-    let rec loopList fs =
-        match fs with
-        | Dir(name, (p1, fs1))::tl when p1.Equals(ReadWrite) || p1.Equals(Write) -> (p, [Dir(name, (p1, fs1@[dir]))]@tl )
-        | Dir(name, (p1, fs1))::tl when p.Equals(Read) ->failwith "permission denied, can only read"
-        | _::tl -> loopList tl 
-        | [] ->(p, fs@[dir])
-    loopList fs
+    if not (p.Equals(Read)) then
+        (p, fs@[dir])
+    else
+        failwith "permission denied"
+
 
   
      
@@ -142,7 +139,7 @@ let count (filesystem:FileSystem) =
 // in "Dir1" and "File1" is in "Dir2".
 
 let  changePermissions(permission:Permission) (path:string list) (filesystem:FileSystem)  = 
-    let (p, elementlist) = filesystem
+ 
     let rec loop  (path:string list) (elementlist) =
         match path  with
         | h::t -> matchFs h t elementlist
@@ -168,8 +165,13 @@ let  changePermissions(permission:Permission) (path:string list) (filesystem:Fil
                 File(name, p1)::fs2
 
         | _ -> failwith "Invalid path"
-    let result = loop path elementlist
-    (p, result)
+        
+    let (p, elementlist) = filesystem
+    if List.isEmpty path then
+        (permission, elementlist)
+    else
+        let result = loop path elementlist
+        (p, result)
 
 
 // 5. Modify the implementations of createFile and createDir to honor the
@@ -248,10 +250,6 @@ let delete  (path: string list) (filesystem: FileSystem) =
     let result = loop path fs
     (p, result)
 
- 
-
-
- 
 // Bonus (1p):
 // 8. Implement the function:
 // recursiveDelete : string list -> FileSystem ->FileSystem
@@ -299,6 +297,7 @@ let recursiveDelete (path: string list) (filesystem: FileSystem) =
             else
                 Dir(n, (p2, r1)) ::deleteContent tl
         | _ -> fs
+
     let (p, fs)  = filesystem 
     let result = loop path fs
     (p, result)
