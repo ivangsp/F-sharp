@@ -61,28 +61,31 @@ type Inproceeding = {
       booktitle:string
       year:int
        
-      pages:(int*int)          option
-      address:string     option
-      month:string          option
-      editor:string      option
-      volume:int         option
-      series:string      option
+      pages:(int*int)       option
+      address:string        option
+      month:int             option
+      editor:string         option
+      volume:int            option
+      series:string         option
+      number: int           option
       organization: string  option
+      publisher: string     option
+      note: string          option
         }
 
 type Book = {
      author:string list option
-     editor:string option
+     editor:string list option
      title:string
      publisher:string
      year:int
 
      volume:int         option
      number:int         option
-     series:string      option
+     series:int      option
      address:string     option 
      edition: string    option
-     month:string       option
+     month:int       option
      note:string        option
     }
 
@@ -90,17 +93,17 @@ type MastersthesisRecord = {
      author:string list
      title:string
      school:string
-     year:int
+     year:string
 
      address:string   option
      month:int        option
      note:string      option
-     Type:string      option
+     type_:string      option
 
  }
  
  type MiscRecord = {
-      author:string list     option
+      author:string  list    option
       title:string           option
       howpublished:string    option
       month:int              option
@@ -155,23 +158,23 @@ let bibliographyData =
               journal="Advances in Bioinformatics"; year=2008; pages=Some(1, 7);  
               number=None;  month=None; note=None;   volume=None});
 
-    Inproceedings({author=["Michael S. Brown"; "Jana Kosecka"; "Christian Theobalt"];
-                 title="2015 International Conference on 3D Vision";
+    Inproceedings({author=["Michael S. Brown"]; number=None; publisher=None;
+                 title="2015 International Conference on 3D Vision";note=None;
                  volume=None; series=None; booktitle="x-Hour Outdoor Photometric Stereo"; 
                  year=2015; pages=Some(19, 22); 
-                 address=Some"Lyon, France"; month=Some"october"; editor=None; organization=None});
+                 address=Some"Lyon, France"; month=Some 10; editor=None; organization=None});
 
-    Inproceedings({author=["Rosa Bottino"; "Johan Jeuring" ; "Remco C. Veltkamp"];
-                 title="Games and Learning Alliance - GALA"; 
+    Inproceedings({author= ["Rosa Bottino"]; number=None; publisher=None;
+                 title="Games and Learning Alliance - GALA"; note=None;
                 booktitle="5th International Conference"; volume=None; 
                 series=None;  year=2016; pages=Some(5,7); address=Some"Netherlands"; 
-                month=Some"December"; editor=None; organization=None});
+                month=Some 12; editor=None; organization=None});
     
-    Books({author=Some["M. Guadalupe Sánchez-Escribano"]; title="Engineering Computational Emotion"; 
+    Books({author=Some["M. Guadalupe"; "Sánchez-Escribano"]; title="Engineering Computational Emotion"; 
             publisher="ISBN 978-3-319-59429-3"; year=2018; volume=None;series=None; address=None;
             edition=None; month=None;note=None; number=None; editor=None});
 
-    Books({author=Some["Mark Hoogendoorn"; "Burkhardt Funk"]; 
+    Books({author=Some["Mark Hoogendoorn,Burkhardt Funk"]; 
             title="Machine Learning for the Quantified Self - On the Art of Learning from Sensory Data"; 
             publisher="ISBN 978-3-319-66307-4"; year=2017; volume=None;series=None; address=None;
             edition=None; month=None;note=None;  number=None; editor=None});
@@ -179,12 +182,12 @@ let bibliographyData =
     Mastersthesis({author=["Afu, Immaculate Ache"]; 
               title="Migration and brain drain effects in Cameroon. ";
               school="Tallinn University of Technology ";
-              year=2016; month=Some 1; address=None; Type=None; note=None });
+              year="2016"; month=Some 1; address=None; type_=None; note=None });
 
     Mastersthesis({author=["Aksjonov, Andrei "]; 
             title=" 3D crane control system. The Modeling and Control of 3D Crane ";
-            school="Tallinn University of Technology "; year=2015; month=Some 6; address=None;
-            Type=None; note=None });
+            school="Tallinn University of Technology "; year="2015"; month=Some 6; address=None;
+            type_=None; note=None });
 
     Misc({author=None; title=Some"TTCN-3 test development and execution platform"; 
             year=Some 2012; month= Some 10;
@@ -253,11 +256,13 @@ let formatInACMReferenceStyle(item:BibliographyItem) =
                                     + a.journal + "," + " " + optionToInt(a.number).ToString()
                                  + " (" + monthToStr(optionToInt(a.month)) + "." + a.year.ToString() 
                                  + "),"+ optionToTuple(a.pages)
-    |Inproceedings  i     -> formatAuthor(i.author) + "." + i.year.ToString() + "." + " " + i.title+". " + 
-                              i.booktitle + "(" + optionToStr(i.series)+")" + "."
-    |Books b              -> formatAuthor(optionToList(b.author)) + "."+b.year.ToString()+"." + " "+ b.title+". "+
-                             optionToStr(b.series) + "."
-    |Mastersthesis m      -> formatAuthor(m.author) + "." + m.year.ToString() + ". " + m.title + ", " + "." + 
+    |Inproceedings  i     -> i.author.ToString() + "." + i.year.ToString() + "." + " " + i.title+". " + 
+                             i.booktitle + "(" + optionToStr(i.series)+")" + "."
+
+    |Books b              -> formatAuthor (optionToList(b.author)) + "."+b.year.ToString()+"." + " "+ b.title+". "+
+                             optionToInt(b.series).ToString() + "."
+
+    |Mastersthesis m      ->formatAuthor(m.author)  + "." + m.year.ToString() + ". " + m.title + ", " + "." + 
                              optionToStr(m.address) 
     |Misc m               -> formatAuthor(optionToList(m.author)) + "."+optionToInt(m.year).ToString()+". "+
                              "(" + monthToStr(optionToInt(m.month))+" "+ optionToInt(m.year).ToString() + ")."
@@ -272,9 +277,9 @@ let getAuthorAndYear (b_item1: BibliographyItem) =
     match b_item1 with
     |Articles a           ->(a.author, a.year)
     |Inproceedings  i     ->(i.author, i.year)
-    |Books b              ->(optionList b.author, b.year)
-    |Mastersthesis m      ->(m.author, m.year)
-    |Misc m               ->(optionList m.author, optionIntValue m.year)
+    |Books b              ->(optionToList b.author, b.year)
+    |Mastersthesis m      ->(m.author, int m.year)
+    |Misc m               ->(optionToList(m.author), optionIntValue m.year)
  
 let compareByAuthorYear (b_item1: BibliographyItem)  (b_item2: BibliographyItem) =  
     let (authorlist2, year2) = getAuthorAndYear(b_item2)
@@ -355,8 +360,13 @@ createBook :
                       month:int option ->
                         note:string option -> BibliographyItem
 *)
-
-let createBook(author:string option)
+let createBook( author:string list option) (editor:string list option) (title:string) (publisher:string) (year:int)
+  (volume:int option) (number:int option) (series:int option) (address:string option) ( edition:string option)
+  (month:int option) (note:string option) =
+    Books {
+      author=author; edition=edition; editor=editor; title=title; publisher=publisher; year=year;
+      volume=volume; number=number; series=series; address=address; month=month; note=note;
+      }
 (*
 createInProceedings :
   author:string ->
@@ -374,6 +384,17 @@ createInProceedings :
                           publisher:string option ->
                             note:string option -> BibliographyItem
 *)
+
+let createInProceedings (author:string list)(title:string) ( booktitle:string) (year) (editor:string option)
+  (volume:int option) (number:int option) (series:string option) (pages:(int * int) option) 
+  (address:string option) (month:int option) (organization:string option) (publisher:string option)
+  (note:string option) =
+    Inproceedings {
+        author=author; title=title; booktitle=booktitle; year=year; editor=editor;
+        volume=volume; number=number; series=series; pages=pages;  address=address;
+        month=month; organization=organization; publisher=publisher; note=note
+        }
+
 (*
 createMScThesis :
   author:string ->
@@ -382,9 +403,15 @@ createMScThesis :
         year:string ->
           type_:string option ->
             address:string option ->
-              month:int option -> note:string -> BibliographyItem
+              month:int option -> note:string option-> BibliographyItem
 
 *)
+let createMScThesis(author:string list) (title:string) (school:string) (year:string) (type_:string option)
+    (address:string option) (month:int option) (note: string option) = 
+    Mastersthesis {
+        author=author; title=title; school=school; year=year; type_=type_; address=address; month=month; note=note
+    }
+
 (*
 createMisc :
   author:string option ->
@@ -395,3 +422,9 @@ createMisc :
             note:string option -> BibliographyItem
 
 *)
+
+let createMisc (author:string list option) (title:string option) (howpublished:string option) (month:int option)
+    (year:int option) (note:string option) =
+    Misc {
+        author = author; title=title; howpublished=howpublished; month=month; year=year;note=note;
+    }

@@ -40,9 +40,11 @@ TUT Student ID:   172663IVSM
 //   E.g. Some Some 1 -> Some 1
 
 let  flattenOption (value: option<option<'T>>) = 
-    Option.bind (id) value
+    //Option.bind (id) value
+    match value with 
+    | Some x    -> x
+    | None      -> None
     
-
 // 2. Write a function
 //    defeatist : list<option<'a>> -> option<list<'a>>
 //    that takes a list of possible successes or failures and returns

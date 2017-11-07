@@ -43,7 +43,7 @@ let minInList (input:float list) =
         | h::tail  when acc > h -> loop tail h
         | h::tail  when acc < h -> loop tail acc 
         | []      -> acc
-    loop input 10000.0
+    loop input System.Double.MaxValue
 
 
 (*
@@ -71,11 +71,26 @@ let swapElementsInList (input) =
 *)
 
 type 'a Tree =
-  | Leaf   of 'a
-  | Branch of 'a Tree * 'a Tree
+    | Leaf   of 'a
+    | Branch of 'a Tree * 'a Tree
 
 
-(*
+// let   minInTree (tree:float Tree)  = 
+//     let rec loop tree  acc= 
+//         match tree with
+//         | Leaf l                when (acc >l)      -> l
+//         | Leaf l                when (acc <l)      -> acc
+//         | Branch (tl, tr) ->    loop tl (loop tr acc) 
+//     loop tree 0.0 
+
+let   minInTree (tree:float Tree)  = 
+    let rec loop tree  acc= 
+        match tree with
+        | Leaf l            -> acc l
+        | Branch (tl, tr)   ->  loop tl (fun vl ->loop tr (fun vr -> if vl > vr then acc vr else acc vl))     
+    loop tree id
+    
+ (*
   Task 4:
 
   Write a function minInTree' : int Tree -> int that returns the minimum label
@@ -83,4 +98,11 @@ type 'a Tree =
   continuation-passing style in combination with accumulation in your
   implementation.
 *)
+let   minInTree (tree:int Tree)  = 
+    let rec loop tree acc f= 
+        match tree with
+        | Leaf l            -> if acc>l then f l else  f acc
+        | Branch (tl, tr)   ->  loop tl acc (fun vl ->loop tr acc (fun vr -> if vl > vr then f vr else f vl))     
+    loop tree System.Int32.MaxValue id
+
 
